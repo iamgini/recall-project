@@ -1,0 +1,20 @@
+{
+  "name": "recall",
+  "version": "1.0.0",
+  "description": "Local-first bookmark search engine",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "deploy": "wrangler pages deploy",
+    "db:init:local": "wrangler d1 execute recall-db --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute recall-db --remote --file=./schema.sql",
+    "types": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260804.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
+  }
+}
