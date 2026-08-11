@@ -138,10 +138,12 @@ cp wrangler.toml.example wrangler.toml
 # Edit wrangler.toml — replace <your-database-id> with the ID from step 1
 ```
 
-### 3. Apply schema
+### 3. Apply schema (required before first use)
 
-- In the Cloudflare Dashboard → D1 → recall-db → Console
+- Cloudflare Dashboard → D1 → recall-db → Console
 - Paste the contents of `schema.sql` and run it
+- You should see 5 successful commands (table + FTS + 3 triggers)
+- **The app will not work until this step is done**
 
 ### 4. Set API key secret
 
