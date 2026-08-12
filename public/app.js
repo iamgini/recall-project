@@ -17,12 +17,53 @@ function authHeaders() {
   return headers;
 }
 
+function readHeaders() {
+  const key = getApiKey();
+  if (!key) return {};
+  return { 'X-API-Key': key };
+}
+
 function requireApiKey() {
   if (getApiKey()) return true;
   toast('Set your API key in Settings first');
   togglePanel('settings-panel');
   $('#settings-key').value = '';
   return false;
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escAttr(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function sanitizeHighlight(html) {
+  if (!html) return '';
+  return html
+    .split(/(<\/?mark>)/gi)
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (lower === '<mark>' || lower === '</mark>') return lower;
+      return escHtml(part);
+    })
+    .join('');
+}
+
+function safeHref(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'http:' || u.protocol === 'https:') return escAttr(url);
+  } catch {}
+  return '#';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -64,22 +105,47 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#settings-panel').classList.remove('active');
   });
 
+  document.querySelectorAll('.cancel-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById(btn.dataset.panel);
+      if (panel) panel.classList.remove('active');
+    });
+  });
+
   $('#add-url').addEventListener('blur', onUrlBlur);
   $('#add-form').addEventListener('submit', onAddSubmit);
 
   const importZone = $('#import-zone');
   importZone.addEventListener('click', () => $('#import-file').click());
-  importZone.addEventListener('dragover', (e) => { e.preventDefault(); importZone.style.borderColor = 'var(--accent)'; });
-  importZone.addEventListener('dragleave', () => { importZone.style.borderColor = 'var(--border)'; });
+  importZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    importZone.style.borderColor = 'var(--accent)';
+  });
+  importZone.addEventListener('dragleave', () => {
+    importZone.style.borderColor = 'var(--border)';
+  });
   importZone.addEventListener('drop', onImportDrop);
   $('#import-file').addEventListener('change', onImportFile);
-});
 
-function readHeaders() {
-  const key = getApiKey();
-  if (!key) return {};
-  return { 'X-API-Key': key };
-}
+  $('#results').addEventListener('click', (e) => {
+    const tagEl = e.target.closest('[data-tag]');
+    if (tagEl) {
+      filterByTag(tagEl.dataset.tag);
+      return;
+    }
+    const delEl = e.target.closest('[data-delete-id]');
+    if (delEl) {
+      deleteBookmark(parseInt(delEl.dataset.deleteId, 10));
+    }
+  });
+
+  $('#tags-bar').addEventListener('click', (e) => {
+    const tagEl = e.target.closest('[data-tag]');
+    if (tagEl) {
+      filterByTag(tagEl.dataset.tag);
+    }
+  });
+});
 
 async function loadBookmarks() {
   const resp = await fetch(`${API}/api/bookmarks`, { headers: readHeaders() });
@@ -122,30 +188,46 @@ function renderResults(results) {
     return;
   }
 
-  list.innerHTML = results.map((r) => {
-    const title = r.title_hl || r.title || r.url;
-    const desc = r.desc_hl || r.description || '';
-    const tags = r.tags ? r.tags.split(',').filter(Boolean) : [];
-    const date = r.created_at ? new Date(r.created_at + 'Z').toLocaleDateString() : '';
-    const truncUrl = r.url.length > 60 ? r.url.substring(0, 60) + '...' : r.url;
-    const secretBadge = r.secret ? '<span class="tag secret-tag">secret</span> ' : '';
+  list.innerHTML = results
+    .map((r) => {
+      const title = r.title_hl
+        ? sanitizeHighlight(r.title_hl)
+        : escHtml(r.title || r.url);
+      const desc = r.desc_hl
+        ? sanitizeHighlight(r.desc_hl)
+        : escHtml(r.description || '');
+      const tags = r.tags ? r.tags.split(',').filter(Boolean) : [];
+      const date = r.created_at
+        ? new Date(r.created_at + 'Z').toLocaleDateString()
+        : '';
+      const truncUrl =
+        r.url.length > 60 ? r.url.substring(0, 60) + '...' : r.url;
+      const secretBadge = r.secret
+        ? '<span class="tag secret-tag">secret</span> '
+        : '';
 
-    return `
+      return `
       <li class="result-item${r.secret ? ' secret' : ''}" data-id="${r.id}">
-        <div class="result-title">${secretBadge}<a href="${escHtml(r.url)}" target="_blank" rel="noopener">${title}</a></div>
+        <div class="result-title">${secretBadge}<a href="${safeHref(r.url)}" target="_blank" rel="noopener noreferrer">${title}</a></div>
         <div class="result-url">${escHtml(truncUrl)}</div>
         ${desc ? `<div class="result-desc">${desc}</div>` : ''}
         <div class="result-footer">
           <div class="result-tags">
-            ${tags.map((t) => `<span class="tag${activeTag === t.trim() ? ' active' : ''}" onclick="filterByTag('${escAttr(t.trim())}')">${escHtml(t.trim())}</span>`).join('')}
+            ${tags
+              .map(
+                (t) =>
+                  `<span class="tag${activeTag === t.trim() ? ' active' : ''}" data-tag="${escAttr(t.trim())}">${escHtml(t.trim())}</span>`
+              )
+              .join('')}
           </div>
           <div>
             <span class="result-date">${date}</span>
-            <button class="btn-danger" onclick="deleteBookmark(${r.id})">remove</button>
+            <button class="btn-danger" data-delete-id="${r.id}">remove</button>
           </div>
         </div>
       </li>`;
-  }).join('');
+    })
+    .join('');
 }
 
 function renderTagsBar(tags) {
@@ -154,20 +236,19 @@ function renderTagsBar(tags) {
     bar.innerHTML = '';
     return;
   }
-  bar.innerHTML = tags.map((t) =>
-    `<span class="tag${activeTag === t.name ? ' active' : ''}" onclick="filterByTag('${escAttr(t.name)}')">${escHtml(t.name)} (${t.count})</span>`
-  ).join('');
+  bar.innerHTML = tags
+    .map(
+      (t) =>
+        `<span class="tag${activeTag === t.name ? ' active' : ''}" data-tag="${escAttr(t.name)}">${escHtml(t.name)} (${t.count})</span>`
+    )
+    .join('');
 }
 
-window.filterByTag = function (tag) {
-  if (activeTag === tag) {
-    activeTag = null;
-  } else {
-    activeTag = tag;
-  }
+function filterByTag(tag) {
+  activeTag = activeTag === tag ? null : tag;
   search($('#search-input').value);
   loadTags();
-};
+}
 
 function togglePanel(id) {
   const panel = $(`#${id}`);
@@ -190,19 +271,25 @@ async function onUrlBlur() {
       headers: authHeaders(),
       body: JSON.stringify({ url }),
     });
-    const meta = await resp.json();
-    if (meta.title && !$('#add-title').value) {
-      $('#add-title').value = meta.title;
+    if (resp.status === 401) {
+      indicator.textContent = 'Invalid API key';
+    } else {
+      const meta = await resp.json();
+      if (meta.title && !$('#add-title').value) {
+        $('#add-title').value = meta.title;
+      }
+      if (meta.description && !$('#add-desc').value) {
+        $('#add-desc').value = meta.description;
+      }
+      indicator.textContent = 'Done';
     }
-    if (meta.description && !$('#add-desc').value) {
-      $('#add-desc').value = meta.description;
-    }
-    indicator.textContent = 'Done';
   } catch {
     indicator.textContent = 'Could not fetch — enter manually';
   }
 
-  setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+  setTimeout(() => {
+    indicator.style.display = 'none';
+  }, 2000);
 }
 
 async function onAddSubmit(e) {
@@ -235,22 +322,59 @@ async function onAddSubmit(e) {
     $('#add-panel').classList.remove('active');
     loadBookmarks();
     loadTags();
+  } else if (resp.status === 401) {
+    toast('Invalid API key — check Settings');
+  } else if (resp.status === 429) {
+    toast('Too many requests — wait a moment');
   } else {
-    toast('Failed to save');
+    const data = await resp.json().catch(() => ({}));
+    toast(data.error || 'Failed to save');
   }
 }
 
-window.deleteBookmark = async function (id) {
-  if (!requireApiKey()) return;
-  if (!confirm('Remove this bookmark?')) return;
+function showConfirm(msg) {
+  return new Promise((resolve) => {
+    const overlay = $('#confirm-modal');
+    $('#confirm-msg').textContent = msg;
+    overlay.classList.add('show');
+    const onYes = () => {
+      cleanup();
+      resolve(true);
+    };
+    const onNo = () => {
+      cleanup();
+      resolve(false);
+    };
+    const cleanup = () => {
+      overlay.classList.remove('show');
+      $('#confirm-yes').removeEventListener('click', onYes);
+      $('#confirm-no').removeEventListener('click', onNo);
+    };
+    $('#confirm-yes').addEventListener('click', onYes);
+    $('#confirm-no').addEventListener('click', onNo);
+  });
+}
 
-  const resp = await fetch(`${API}/api/bookmarks/${id}`, { method: 'DELETE', headers: authHeaders() });
+async function deleteBookmark(id) {
+  if (!requireApiKey()) return;
+  if (!(await showConfirm('Remove this bookmark?'))) return;
+
+  const resp = await fetch(`${API}/api/bookmarks/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
   if (resp.ok) {
     toast('Bookmark removed');
     loadBookmarks();
     loadTags();
+  } else if (resp.status === 401) {
+    toast('Invalid API key — check Settings');
+  } else if (resp.status === 429) {
+    toast('Too many requests — wait a moment');
+  } else {
+    toast('Failed to delete bookmark');
   }
-};
+}
 
 function onImportDrop(e) {
   e.preventDefault();
@@ -283,6 +407,15 @@ async function importFile(file) {
     result.className = 'import-result success';
     loadBookmarks();
     loadTags();
+  } else if (resp.status === 401) {
+    result.textContent = 'Invalid API key — check Settings';
+    result.className = 'import-result error';
+  } else if (resp.status === 413) {
+    result.textContent = 'File too large (max 5MB)';
+    result.className = 'import-result error';
+  } else if (resp.status === 429) {
+    result.textContent = 'Too many requests — wait a moment';
+    result.className = 'import-result error';
   } else {
     result.textContent = 'Import failed';
     result.className = 'import-result error';
@@ -294,14 +427,4 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 2500);
-}
-
-function escHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function escAttr(str) {
-  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }

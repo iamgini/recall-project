@@ -383,6 +383,51 @@ header p {
   margin-bottom: 0.5rem;
 }
 
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+}
+
+.modal p {
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.modal .form-actions {
+  justify-content: center;
+}
+
+.btn-danger-fill {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn-danger-fill:hover {
+  background: #c44550;
+  border-color: #c44550;
+  color: #fff;
+}
+
 footer {
   text-align: center;
   padding: 2rem 0 1rem;

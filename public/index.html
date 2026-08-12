@@ -56,7 +56,7 @@
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Save</button>
-          <button type="button" class="btn" onclick="document.getElementById('add-panel').classList.remove('active')">Cancel</button>
+          <button type="button" class="btn cancel-btn" data-panel="add-panel">Cancel</button>
         </div>
       </form>
     </div>
@@ -84,7 +84,7 @@
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Save</button>
-          <button type="button" class="btn" onclick="document.getElementById('settings-panel').classList.remove('active')">Cancel</button>
+          <button type="button" class="btn cancel-btn" data-panel="settings-panel">Cancel</button>
         </div>
       </form>
     </div>
@@ -96,8 +96,18 @@
     <ul class="results" id="results"></ul>
 
     <footer>
-      <a href="https://github.com/iamgini/recall-project" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/iamgini/recall-project" target="_blank" rel="noopener noreferrer">GitHub</a>
     </footer>
+  </div>
+
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal">
+      <p id="confirm-msg">Remove this bookmark?</p>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-danger-fill" id="confirm-yes">Remove</button>
+        <button class="btn" id="confirm-no">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>

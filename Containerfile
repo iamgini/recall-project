@@ -1,11 +1,14 @@
 FROM node:22-slim
 
+RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
 
-COPY package.json ./
+USER node
+
+COPY --chown=node:node package.json ./
 RUN npm install
 
-COPY . .
+COPY --chown=node:node . .
 
 EXPOSE 8788
 

@@ -27,10 +27,15 @@ recall() {
   if [ "$1" = "search" ]; then
     shift
     local query="$*"
-    curl -s -H "X-API-Key: ${RECALL_API_KEY}" \
+    curl -s --max-time 30 -H "X-API-Key: ${RECALL_API_KEY}" \
       "${RECALL_URL}/api/search?q=$(printf '%s' "$query" | jq -sRr @uri)" \
       | jq -r '.results[] | "\(.title // .url)\n  \(.url)\n  tags: \(.tags)\(.secret // 0 | if . == 1 then "  [secret]" else "" end)\n"'
     return
+  fi
+
+  if [ -z "$RECALL_API_KEY" ]; then
+    echo "Error: RECALL_API_KEY not set. Export it in your shell."
+    return 1
   fi
 
   local secret=false
@@ -46,11 +51,15 @@ recall() {
     tags=$(IFS=,; echo "$*")
   fi
 
+  local payload
+  payload=$(jq -n --arg url "$url" --arg tags "$tags" --argjson secret "$secret" \
+    '{url: $url, tags: $tags, secret: $secret}')
+
   local result
-  result=$(curl -s -X POST "${RECALL_URL}/api/bookmarks" \
+  result=$(curl -s --max-time 30 -X POST "${RECALL_URL}/api/bookmarks" \
     -H "Content-Type: application/json" \
     -H "X-API-Key: ${RECALL_API_KEY}" \
-    -d "{\"url\":\"${url}\",\"tags\":\"${tags}\",\"secret\":${secret}}")
+    -d "$payload")
 
   local title
   title=$(echo "$result" | jq -r '.title // .error // "unknown"')
